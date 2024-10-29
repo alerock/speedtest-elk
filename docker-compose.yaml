@@ -1,0 +1,68 @@
+version: '3.7'
+
+services:
+  speedtest:
+    build: ./speedtest
+    container_name: speedtest
+    volumes:
+      - shared-data:/shared
+    networks:
+      - elk
+
+  logstash:
+    depends_on:
+      - elasticsearch
+    image: docker.elastic.co/logstash/logstash:8.15.0
+    container_name: logstash
+    volumes:
+      - ./logstash/config:/usr/share/logstash/config
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - shared-data:/shared
+    ports:
+      - 5000:5000
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - elk
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: elasticsearch
+    volumes:
+      - ./elasticsearch/config:/usr/share/elasticsearch/config:rw
+      - ./elasticsearch/data:/usr/share/elasticsearch/data:rw
+      - shared-data:/shared
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - elk
+
+  kibana:
+   image: docker.elastic.co/kibana/kibana:8.15.0
+   container_name: kibana
+   volumes:
+     - ./kibana/data:/usr/share/kibana/data:rw
+     - ./kibana/config:/usr/share/kibana/config:rw
+   ports:
+     - 5601:5601
+   environment:
+     - SERVERNAME=kibana
+     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+   networks:
+     - elk
+
+networks:
+  elk:
+    driver: bridge
+
+volumes:
+  shared-data:
